@@ -71,7 +71,7 @@ export const googleCalendarService = {
       // Formulate detailed agenda metadata representing the active cabinet demand
       const event = {
         summary: `Retorno Demanda - ${registration.nome_completo}`,
-        description: `🔹 Nome Completo: ${registration.nome_completo}\n🔹 Assunto/Demanda: ${demand.assunto}\n🔹 Observação: ${demand.observacoes || 'Nenhuma'}\n🔹 Responsável do Gabinete: ${creator?.full_name || 'Gabinete'}`,
+        description: `✅ Cadastro de Eleitor e Demanda Realizado com Sucesso!\n\n🔹 Nome Completo: ${registration.nome_completo}\n🔹 Assunto/Demanda: ${demand.assunto}\n🔹 Observação: ${demand.observacoes || 'Nenhuma'}\n🔹 Responsável do Gabinete: ${creator?.full_name || 'Gabinete'}\n\n📢 Lembrete de retorno registrado de forma automática pelo sistema de Gabinete.`,
         start: {
           date: demand.data_prevista_retorno || new Date().toISOString().split('T')[0],
         },
