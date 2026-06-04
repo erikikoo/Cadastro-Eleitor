@@ -370,10 +370,17 @@ app.post("/api/calendar/save-token", async (req, res) => {
       process.env.GOOGLE_CLIENT_SECRET = clientSecret;
     }
 
-    fs.writeFileSync(envFilePath, envContent, 'utf8');
+    try {
+      fs.writeFileSync(envFilePath, envContent, 'utf8');
+    } catch (writeErr: any) {
+      console.warn("[SERVER API] Could not write to .env file (expected on read-only environments like Vercel). Operating in-memory.", writeErr.message || writeErr);
+    }
     process.env.GOOGLE_REFRESH_TOKEN = refreshToken;
 
-    res.json({ success: true, message: "Configurações de integração com a agenda atualizadas e salvas com sucesso!" });
+    res.json({ 
+      success: true, 
+      message: "Configurações de integração atualizadas com sucesso! (Salvo em memória temporária se o servidor for somente leitura)." 
+    });
   } catch (err: any) {
     console.error("[SERVER API] Error saving manual token:", err);
     res.status(500).json({ success: false, error: err.message || "Erro ao salvar token" });
@@ -419,7 +426,11 @@ app.post("/api/calendar/exchange-code", async (req, res) => {
         envContent += `\nGOOGLE_REFRESH_TOKEN=${rToken}`;
       }
 
-      fs.writeFileSync(envFilePath, envContent, 'utf8');
+      try {
+        fs.writeFileSync(envFilePath, envContent, 'utf8');
+      } catch (writeErr: any) {
+        console.warn("[SERVER API] Could not write to .env file during exchange code (expected on read-only environments like Vercel). Operating in-memory.", writeErr.message || writeErr);
+      }
       process.env.GOOGLE_REFRESH_TOKEN = rToken;
     }
 
