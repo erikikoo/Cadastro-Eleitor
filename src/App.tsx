@@ -857,6 +857,53 @@ function AppContent() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
+        {serverConfig?.googleConfigured && !serverConfig?.googleTokenValid && (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-3 duration-300">
+            <div className="flex items-start gap-3">
+              <div className="bg-amber-100 p-2.5 rounded-lg text-amber-700 mt-0.5 md:mt-0">
+                <Calendar className="h-5 w-5 animate-pulse" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-amber-900 flex items-center gap-1.5">
+                  Revalidação do Google Agenda Necessária
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-200 text-amber-800 border border-amber-300 uppercase">
+                    Ação Requerida
+                  </span>
+                </h4>
+                <p className="text-xs text-amber-700 mt-1 max-w-2xl leading-relaxed">
+                  O token de integração com a agenda de retorno do gabinete expirou ou foi revogado. 
+                  Para garantir a sincronização automática e em tempo real das demandas dos eleitores, é preciso restabelecer a autorização da conta Google.
+                </p>
+                {serverConfig?.googleTokenError && (
+                  <p className="text-[10px] text-amber-600/85 mt-1 font-mono">
+                    Motivo: {serverConfig.googleTokenError}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex-shrink-0 w-full md:w-auto">
+              <Button
+                type="button"
+                onClick={handleMasterReauthorize}
+                disabled={loadingConfig}
+                className="w-full md:w-auto bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4 py-2 rounded-lg flex items-center justify-center gap-2 shadow-sm transition-all h-9"
+              >
+                {loadingConfig ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Autorizando...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCcw className="h-3.5 w-3.5 animate-spin-slow" />
+                    Revalidar Token Agora
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="text-center md:text-left">
