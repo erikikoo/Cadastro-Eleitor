@@ -1,0 +1,21 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Secure .env files and configuration
+  <FilesMatch "^\.env">
+    Order allow,deny
+    Deny from all
+  </FilesMatch>
+
+  # Route API endpoints directly to PHP scripts
+  RewriteRule ^api/calendar/sync$ api/calendar/sync.php [L,QSA]
+  RewriteRule ^api/health$ api/health.php [L,QSA]
+
+  # Standalone SPA routing for React Router
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{REQUEST_FILENAME} !-l
+  RewriteRule . /index.html [L]
+</IfModule>

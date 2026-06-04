@@ -1,0 +1,6 @@
+{
+  "name": "DataLink - Gestão e Análise",
+  "description": "Plataforma avançada para gestão de eleitorado, controle inteligente de demandas e análise estratégica de dados com dashboard em tempo real.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
