@@ -619,21 +619,29 @@ async function startServer() {
       });
     }
 
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server successfully listening on http://0.0.0.0:${PORT}`);
-    });
+    if (process.env.VERCEL) {
+      console.log("Running on Vercel serverless environment - skipping app.listen");
+    } else {
+      app.listen(PORT, "0.0.0.0", () => {
+        console.log(`Server successfully listening on http://0.0.0.0:${PORT}`);
+      });
+    }
   } catch (error) {
     console.error("CRITICAL error during server boot:", error);
     // Safe fallback to bind port and avoid container boot crashes
-    try {
-      app.listen(PORT, "0.0.0.0", () => {
-        console.warn(`Fallback server listening on port ${PORT} to prevent platform boot fail.`);
-      });
-    } catch (fallbackErr) {
-      console.error("Fallback server listen failed:", fallbackErr);
+    if (!process.env.VERCEL) {
+      try {
+        app.listen(PORT, "0.0.0.0", () => {
+          console.warn(`Fallback server listening on port ${PORT} to prevent platform boot fail.`);
+        });
+      } catch (fallbackErr) {
+        console.error("Fallback server listen failed:", fallbackErr);
+      }
     }
   }
 }
 
 startServer();
+
+export default app;
 
