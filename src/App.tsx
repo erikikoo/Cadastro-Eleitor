@@ -376,6 +376,19 @@ function ProfileContent({
 
               {showManualConfigPanel && (
                 <div className="bg-white border border-slate-200 p-2.5 rounded-md space-y-2.5 mt-2 text-[11px] text-left animate-in slide-in-from-top-1 duration-200">
+                  <div className="p-2 border border-blue-200 bg-blue-50/50 rounded text-slate-700 space-y-1 text-[10px] leading-relaxed">
+                    <span className="font-bold text-blue-800">🔑 Configuração para Vercel:</span>
+                    <p>
+                      Para evitar o erro <code>origin_mismatch</code> no Google, você deve usar suas próprias credenciais em produção. Crie um ID de Cliente no <strong>Google Cloud Console</strong> e registre a origem:
+                    </p>
+                    <div className="bg-slate-100 p-1.5 rounded font-mono text-[9px] select-all break-all border border-slate-200 text-slate-800">
+                      https://{window.location.host}
+                    </div>
+                    <p>
+                      Adicione como <strong>Origem JavaScript Autorizada</strong> no Console do Google Cloud.
+                    </p>
+                  </div>
+
                   <div className="space-y-1">
                     <Label className="text-[10px] font-semibold text-slate-600">Client ID (Opcional)</Label>
                     <Input
