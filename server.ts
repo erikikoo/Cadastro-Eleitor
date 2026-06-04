@@ -123,6 +123,7 @@ function getGoogleCredentials() {
   let fileClientId = "";
   let fileClientSecret = "";
   let fileRefreshToken = "";
+  let fileCalendarId = "";
 
   if (fs.existsSync(envFilePath)) {
     try {
@@ -141,6 +142,7 @@ function getGoogleCredentials() {
           if (key === "GOOGLE_CLIENT_ID") fileClientId = val;
           if (key === "GOOGLE_CLIENT_SECRET") fileClientSecret = val;
           if (key === "GOOGLE_REFRESH_TOKEN") fileRefreshToken = val;
+          if (key === "VITE_GOOGLE_CALENDAR_ID") fileCalendarId = val;
         }
       }
     } catch (e) {
@@ -151,8 +153,9 @@ function getGoogleCredentials() {
   const clientId = fileClientId || process.env.GOOGLE_CLIENT_ID || "";
   const clientSecret = fileClientSecret || process.env.GOOGLE_CLIENT_SECRET || "";
   const refreshToken = fileRefreshToken || process.env.GOOGLE_REFRESH_TOKEN || "";
+  const calendarId = fileCalendarId || process.env.VITE_GOOGLE_CALENDAR_ID || "primary";
 
-  return { clientId, clientSecret, refreshToken };
+  return { clientId, clientSecret, refreshToken, calendarId };
 }
 
 // API routes FIRST
@@ -457,7 +460,7 @@ app.post("/api/calendar/sync", async (req, res) => {
   try {
     const { event, calendarId, eventId, googleAccessToken } = req.body;
 
-    const { clientId, clientSecret, refreshToken } = getGoogleCredentials();
+    const { clientId, clientSecret, refreshToken, calendarId: envCalendarId } = getGoogleCredentials();
 
     let oauthClientToUse;
     let isUsingFallback = false;
@@ -501,7 +504,7 @@ app.post("/api/calendar/sync", async (req, res) => {
     }
 
     const calendar = google.calendar({ version: "v3", auth: oauthClientToUse });
-    let targetCalendarId = calendarId || process.env.VITE_GOOGLE_CALENDAR_ID || 'primary';
+    let targetCalendarId = calendarId || envCalendarId || 'primary';
     console.log(`[SERVER API] Syncing to calendar ID: ${targetCalendarId} - Fallback Active: ${isUsingFallback}`);
 
     let response;

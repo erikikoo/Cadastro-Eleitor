@@ -64,7 +64,7 @@ export const googleCalendarService = {
     registration: Registration, 
     demand: Demand, 
     creator?: { full_name?: string | null; role?: string } | null
-  ): Promise<{ success: boolean; disabled?: boolean; data?: { id: string | null } | null; error?: string }> {
+  ): Promise<{ success: boolean; disabled?: boolean; data?: { id: string | null } | null; error?: string; fallbackToPrimaryUsed?: boolean }> {
     try {
       const googleAccessToken = await this.getProviderToken();
 
@@ -103,13 +103,74 @@ export const googleCalendarService = {
       const result = await response.ok ? await response.json() : {};
       return { 
         success: true, 
-        data: { id: result.id || result.eventId || null } 
+        data: { id: result.id || result.eventId || null },
+        fallbackToPrimaryUsed: !!result.fallbackToPrimaryUsed
       };
     } catch (e: any) {
       console.error('[googleCalendarService] Sincronização falhou:', e);
       return { 
         success: false, 
         error: e.message || 'Erro inesperado ao sincronizar com o Google Agenda.' 
+      };
+    }
+  },
+
+  /**
+   * Syncs the post-contact reminder (Pós-Contato) for a registered elector to Google Calendar.
+   */
+  async createPostContactEvent(
+    registration: Registration,
+    creator?: { full_name?: string | null; role?: string } | null
+  ): Promise<{ success: boolean; data?: { id: string | null } | null; error?: string; fallbackToPrimaryUsed?: boolean }> {
+    try {
+      if (!registration.lembrete_contato_ativo || !registration.data_proximo_contato) {
+        return { success: false, error: 'Lembrete de contato desativado para este eleitor.' };
+      }
+
+      const googleAccessToken = await this.getProviderToken();
+
+      const event = {
+        summary: `📞 Pós-Contato - ${registration.nome_completo}`,
+        description: `✅ Cadastro de Eleitor Realizado com Sucesso!\n\n📢 Lembrete de Pós-Contato com o Eleitor:\n🔹 Nome Completo: ${registration.nome_completo}\n🔹 WhatsApp/Celular: ${registration.whatsapp || 'Não informado'}\n🔹 Responsável pelo Cadastro: ${creator?.full_name || 'Gabinete'}\n🔹 Cidade: ${registration.cidade || 'Não informada'}\n🔹 Bairro: ${registration.bairro || 'Não informado'}\n\nLembrete de retorno de contato sugerido em ${registration.intervalo_contato_dias} dias após o cadastro, registrado automaticamente pelo sistema de Gabinete.`,
+        start: {
+          date: registration.data_proximo_contato,
+        },
+        end: {
+          date: registration.data_proximo_contato,
+        },
+      };
+
+      const response = await fetch(getApiUrl('calendar/sync'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          event,
+          eventId: registration.google_contact_event_id || undefined,
+          googleAccessToken: googleAccessToken
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        return { 
+          success: false, 
+          error: errData.error || `Erro HTTP ${response.status}` 
+        };
+      }
+
+      const result = await response.json().catch(() => ({}));
+      return { 
+        success: true, 
+        data: { id: result.id || result.eventId || null },
+        fallbackToPrimaryUsed: !!result.fallbackToPrimaryUsed
+      };
+    } catch (e: any) {
+      console.error('[googleCalendarService] Sincronização de pós-contato falhou:', e);
+      return { 
+        success: false, 
+        error: e.message || 'Erro inesperado ao sincronizar pós-contato.' 
       };
     }
   }

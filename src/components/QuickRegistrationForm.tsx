@@ -129,6 +129,11 @@ export function QuickRegistrationForm({ onSuccess, onCancel }: QuickRegistration
   const onSubmit = async (values: QuickFormValues) => {
     const toastId = toast.loading('Salvando registro rápido...');
     
+    // Calcular data recomendada para o próximo contato
+    const proximo_contato_date = new Date();
+    proximo_contato_date.setDate(proximo_contato_date.getDate() + 30); // 30 dias de intervalo por padrão no cadastro rápido
+    const data_proximo_contato = proximo_contato_date.toISOString().split('T')[0];
+
     const newRegistration: Registration = {
       id: crypto.randomUUID(),
       nome_completo: values.nome_completo,
@@ -148,6 +153,7 @@ export function QuickRegistrationForm({ onSuccess, onCancel }: QuickRegistration
       responsavel: profile?.full_name || user?.email?.split('@')[0] || 'Sistema',
       lembrete_contato_ativo: true,
       intervalo_contato_dias: 30,
+      data_proximo_contato,
       possuiFilhos: false,
       created_at: new Date().toISOString(),
       demands: values.demands.map(d => {
@@ -177,9 +183,26 @@ export function QuickRegistrationForm({ onSuccess, onCancel }: QuickRegistration
       
       // Sincronizar automaticamente com Google Agenda
       let syncedCount = 0;
-      const updatedDemands = [...newRegistration.demands];
       let needsUpdate = false;
+      let fallbackDetected = false;
 
+      // 1. Sync post-contact event for the elector
+      if (newRegistration.lembrete_contato_ativo && newRegistration.data_proximo_contato) {
+        const contactResult = await googleCalendarService.createPostContactEvent(newRegistration, profile);
+        if (contactResult.success && contactResult.data?.id) {
+          newRegistration.google_contact_event_id = contactResult.data.id;
+          needsUpdate = true;
+          syncedCount++;
+          if (contactResult.fallbackToPrimaryUsed) {
+            fallbackDetected = true;
+          }
+        } else if (!contactResult.success) {
+          console.warn('[Quick Registration Google Sync] Post-contact sync failed:', contactResult.error);
+        }
+      }
+
+      // 2. Sync all demands for the elector
+      const updatedDemands = [...newRegistration.demands];
       for (let i = 0; i < updatedDemands.length; i++) {
         const demand = updatedDemands[i];
         const result = await googleCalendarService.createEvent(newRegistration, demand, profile);
@@ -190,6 +213,9 @@ export function QuickRegistrationForm({ onSuccess, onCancel }: QuickRegistration
           };
           needsUpdate = true;
           syncedCount++;
+          if (result.fallbackToPrimaryUsed) {
+            fallbackDetected = true;
+          }
         }
       }
       
@@ -199,7 +225,14 @@ export function QuickRegistrationForm({ onSuccess, onCancel }: QuickRegistration
       }
       
       if (syncedCount > 0) {
-        toast.success(`${syncedCount} demanda(s) sincronizada(s) no Google Agenda`);
+        toast.success(`${syncedCount} item(s) sincronizado(s) no Google Agenda (demandas e pós-contato)`);
+      }
+
+      if (fallbackDetected) {
+        toast.warning(
+          "📢 Agenda de contingência usada: O Google recusou a inserção na agenda personalizada (provavelmente por falta de permissão ou id incorreto) e salvou na sua Agenda Principal (Primary).",
+          { duration: 8000 }
+        );
       }
 
       toast.success('Cadastro rápido finalizado!', { id: toastId });

@@ -33,6 +33,7 @@ export interface Registration {
   lembrete_contato_ativo: boolean;
   intervalo_contato_dias: number;
   data_proximo_contato?: string;
+  google_contact_event_id?: string;
   possuiFilhos?: boolean;
   filhos?: {
     nome: string;

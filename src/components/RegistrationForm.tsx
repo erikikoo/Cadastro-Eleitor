@@ -109,7 +109,7 @@ interface RegistrationFormProps {
 
 export function RegistrationForm({ onSuccess, onCancel, initialData }: RegistrationFormProps) {
   const [isSearchingCep, setIsSearchingCep] = useState(false);
-  const [syncWithGoogle, setSyncWithGoogle] = useState(false);
+  const [syncWithGoogle, setSyncWithGoogle] = useState(true);
   const { profile, user } = useAuth();
 
   const {
@@ -277,34 +277,63 @@ export function RegistrationForm({ onSuccess, onCancel, initialData }: Registrat
       await saveRegistration(newRegistration);
       
       // Sincronizar com Google Agenda se solicitado
-      if (syncWithGoogle && newRegistration.demands && newRegistration.demands.length > 0) {
+      if (syncWithGoogle) {
         let syncedCount = 0;
-        const updatedDemands = [...newRegistration.demands];
         let needsUpdate = false;
+        let fallbackDetected = false;
 
-        for (let i = 0; i < updatedDemands.length; i++) {
-          const demand = updatedDemands[i];
-          const result = await googleCalendarService.createEvent(newRegistration, demand, profile);
-          if (result.success && result.data?.id) {
-            updatedDemands[i] = {
-              ...demand,
-              google_event_id: result.data.id
-            };
+        // 1. Sync post-contact event for the elector
+        if (newRegistration.lembrete_contato_ativo && newRegistration.data_proximo_contato) {
+          const contactResult = await googleCalendarService.createPostContactEvent(newRegistration, profile);
+          if (contactResult.success && contactResult.data?.id) {
+            newRegistration.google_contact_event_id = contactResult.data.id;
             needsUpdate = true;
             syncedCount++;
-          } else if (!result.success) {
-            toast.error(`Erro Google: ${result.error}`);
-            break;
+            if (contactResult.fallbackToPrimaryUsed) {
+              fallbackDetected = true;
+            }
+          } else if (!contactResult.success) {
+            console.warn('[Google Sync] Could not sync post-contact event:', contactResult.error);
           }
         }
 
-        if (needsUpdate) {
+        // 2. Sync all demands for the elector
+        if (newRegistration.demands && newRegistration.demands.length > 0) {
+          const updatedDemands = [...newRegistration.demands];
+          for (let i = 0; i < updatedDemands.length; i++) {
+            const demand = updatedDemands[i];
+            const result = await googleCalendarService.createEvent(newRegistration, demand, profile);
+            if (result.success && result.data?.id) {
+              updatedDemands[i] = {
+                ...demand,
+                google_event_id: result.data.id
+              };
+              needsUpdate = true;
+              syncedCount++;
+              if (result.fallbackToPrimaryUsed) {
+                fallbackDetected = true;
+              }
+            } else if (!result.success) {
+              toast.error(`Erro ao sincronizar demanda no Google: ${result.error}`);
+              break;
+            }
+          }
           newRegistration.demands = updatedDemands;
+        }
+
+        if (needsUpdate) {
           await saveRegistration(newRegistration);
         }
 
         if (syncedCount > 0) {
-          toast.success(`${syncedCount} demanda(s) sincronizada(s) no Google Agenda`);
+          toast.success(`${syncedCount} item(s) sincronizado(s) no Google Agenda (demandas e pós-contato)`);
+        }
+
+        if (fallbackDetected) {
+          toast.warning(
+            "📢 Agenda customizada inacessível: O Google recusou a inserção na agenda personalizada (provavelmente por falta de permissão ou ID incorreto) e salvou na sua Agenda Principal (Primary) como contingência.",
+            { duration: 10000 }
+          );
         }
       }
 
@@ -833,6 +862,26 @@ export function RegistrationForm({ onSuccess, onCancel, initialData }: Registrat
             ))}
           </div>
         )}
+      </div>
+
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-3 bg-blue-50/50 rounded-lg border border-blue-100 mt-4">
+        <label className="flex items-center gap-2.5 cursor-pointer w-full">
+          <input
+            type="checkbox"
+            checked={syncWithGoogle}
+            onChange={(e) => setSyncWithGoogle(e.target.checked)}
+            className="h-4 w-4 rounded border-blue-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+          />
+          <div className="text-left">
+            <span className="text-xs font-bold text-blue-900 flex items-center gap-1">
+              <Calendar className="h-3.5 w-3.5 text-blue-600" />
+              Sincronizar com o Google Agenda
+            </span>
+            <p className="text-[10px] text-blue-700/80 leading-tight">
+              Sincroniza automaticamente as demandas e o pós-contato do eleitor na agenda do gabinete.
+            </p>
+          </div>
+        </label>
       </div>
 
       <div className="flex justify-end gap-3 pt-4">
