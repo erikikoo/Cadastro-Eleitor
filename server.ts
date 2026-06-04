@@ -1,6 +1,5 @@
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
 import { google } from "googleapis";
 import dotenv from "dotenv";
 import fs from "fs";
@@ -158,38 +157,47 @@ function getGoogleCredentials() {
 
 // API routes FIRST
 app.get("/api/health", async (req, res) => {
-  const { clientId, clientSecret, refreshToken } = getGoogleCredentials();
-  
-  let isTokenValid = false;
-  let tokenError = null;
-  let tokenErrorDetail: any = null;
+  try {
+    const { clientId, clientSecret, refreshToken } = getGoogleCredentials();
+    
+    let isTokenValid = false;
+    let tokenError = null;
+    let tokenErrorDetail: any = null;
 
-  if (clientId && clientSecret && refreshToken) {
-    try {
-      const oauth2ClientCheck = new google.auth.OAuth2(clientId, clientSecret);
-      oauth2ClientCheck.setCredentials({ refresh_token: refreshToken });
-      await oauth2ClientCheck.getAccessToken();
-      isTokenValid = true;
-    } catch (err: any) {
-      console.log("[SERVER] Google master token is currently invalid/expired (User action required to re-authenticate):", err.message || err.error || err);
-      tokenError = err.message || err.error || "invalid_grant";
-      tokenErrorDetail = {
-        message: err.message,
-        code: err.code || err.status,
-        response: err.response?.data
-      };
+    if (clientId && clientSecret && refreshToken) {
+      try {
+        const oauth2ClientCheck = new google.auth.OAuth2(clientId, clientSecret);
+        oauth2ClientCheck.setCredentials({ refresh_token: refreshToken });
+        await oauth2ClientCheck.getAccessToken();
+        isTokenValid = true;
+      } catch (err: any) {
+        console.log("[SERVER] Google master token is currently invalid/expired (User action required to re-authenticate):", err.message || err.error || err);
+        tokenError = err.message || err.error || "invalid_grant";
+        tokenErrorDetail = {
+          message: err.message,
+          code: err.code || err.status,
+          response: err.response?.data
+        };
+      }
     }
-  }
 
-  res.json({
-    status: "ok",
-    googleConfigured: !!(clientId && clientSecret && refreshToken),
-    googleTokenValid: isTokenValid,
-    googleTokenError: tokenError,
-    googleTokenErrorDetail: tokenErrorDetail,
-    clientId: clientId || "google-client-configured",
-    calendarId: process.env.VITE_GOOGLE_CALENDAR_ID || "not specified"
-  });
+    res.json({
+      status: "ok",
+      googleConfigured: !!(clientId && clientSecret && refreshToken),
+      googleTokenValid: isTokenValid,
+      googleTokenError: tokenError,
+      googleTokenErrorDetail: tokenErrorDetail,
+      clientId: clientId || "google-client-configured",
+      calendarId: process.env.VITE_GOOGLE_CALENDAR_ID || "not specified"
+    });
+  } catch (error: any) {
+    console.error("[SERVER] Health check endpoint crashed:", error);
+    res.status(500).json({
+      status: "error",
+      error: error.message || "Internal Server Error during health check",
+      details: error.stack
+    });
+  }
 });
 
 /**
@@ -595,11 +603,13 @@ async function startServer() {
   try {
     // Robust detection of production mode (strict NODE_ENV check or physical dist/index.html checks)
     const isProduction = process.env.NODE_ENV === "production" || 
+                         !!process.env.VERCEL ||
                          fs.existsSync(path.join(appRoot, 'dist', 'index.html')) || 
                          !fs.existsSync(path.join(appRoot, 'src'));
 
     if (!isProduction) {
       console.log("Starting server in DEVELOPMENT mode with Vite middleware...");
+      const { createServer: createViteServer } = await import("vite");
       const vite = await createViteServer({
         server: { middlewareMode: true },
         appType: "spa",
