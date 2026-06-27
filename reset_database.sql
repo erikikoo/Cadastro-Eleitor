@@ -8,6 +8,7 @@ DROP TRIGGER IF EXISTS on_profile_deleted ON public.profiles;
 DROP FUNCTION IF EXISTS public.handle_delete_user CASCADE;
 
 -- 2. Remover tabelas existentes
+DROP TABLE IF EXISTS public.demands CASCADE;
 DROP TABLE IF EXISTS public.registrations CASCADE;
 DROP TABLE IF EXISTS public.profiles CASCADE;
 
@@ -182,3 +183,37 @@ BEGIN
     ON CONFLICT (id) DO UPDATE SET role = 'chefe_de_gabinete', email = 'andersonmaroque@gmail.com';
   END IF;
 END $$;
+
+-- 8. Tabela de demandas (demands) relacional
+CREATE TABLE IF NOT EXISTS public.demands (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  registration_id UUID NOT NULL REFERENCES public.registrations(id) ON DELETE CASCADE,
+  assunto TEXT NOT NULL,
+  data_pedido DATE NOT NULL,
+  atendido BOOLEAN DEFAULT false,
+  data_atendimento DATE,
+  prazo_retorno_dias INTEGER DEFAULT 0,
+  data_prevista_retorno DATE,
+  retorno_realizado BOOLEAN DEFAULT false,
+  observacoes TEXT,
+  google_event_id TEXT,
+  files JSONB DEFAULT '[]',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Habilitar RLS para tabela de demandas
+ALTER TABLE public.demands ENABLE ROW LEVEL SECURITY;
+
+-- Criar política de acesso total para usuários autenticados na tabela demands
+DROP POLICY IF EXISTS "Acesso total usuários autenticados na tabela demands" ON public.demands;
+CREATE POLICY "Acesso total usuários autenticados na tabela demands" ON public.demands
+  FOR ALL
+  USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');
+
+-- Criar índices de busca para demandas
+CREATE INDEX IF NOT EXISTS idx_demands_registration_id ON public.demands(registration_id);
+CREATE INDEX IF NOT EXISTS idx_demands_atendido ON public.demands(atendido);
+CREATE INDEX IF NOT EXISTS idx_demands_retorno_realizado ON public.demands(retorno_realizado);
+

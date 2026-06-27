@@ -156,6 +156,7 @@ export function QuickRegistrationForm({ onSuccess, onCancel }: QuickRegistration
       data_proximo_contato,
       possuiFilhos: false,
       created_at: new Date().toISOString(),
+      created_by: user?.id,
       demands: values.demands.map(d => {
         let data_prevista_retorno = undefined;
         if (d.atendido && d.data_atendimento) {

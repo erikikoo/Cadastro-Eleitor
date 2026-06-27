@@ -167,6 +167,53 @@ BEGIN
     ALTER TABLE registrations ADD COLUMN updated_at TIMESTAMPTZ;
   END IF;
 
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='registrations' AND column_name='created_by') THEN
+    ALTER TABLE registrations ADD COLUMN created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL;
+  END IF;
+
+  -- Garantir que a tabela demands e suas colunas estejam corretas se já existir
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='demands' AND table_schema='public') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='demands' AND table_schema='public' AND column_name='registration_id') THEN
+      ALTER TABLE public.demands ADD COLUMN registration_id UUID NOT NULL REFERENCES public.registrations(id) ON DELETE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='demands' AND table_schema='public' AND column_name='assunto') THEN
+      ALTER TABLE public.demands ADD COLUMN assunto TEXT NOT NULL DEFAULT 'Geral';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='demands' AND table_schema='public' AND column_name='data_pedido') THEN
+      ALTER TABLE public.demands ADD COLUMN data_pedido DATE NOT NULL DEFAULT CURRENT_DATE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='demands' AND table_schema='public' AND column_name='atendido') THEN
+      ALTER TABLE public.demands ADD COLUMN atendido BOOLEAN DEFAULT false;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='demands' AND table_schema='public' AND column_name='data_atendimento') THEN
+      ALTER TABLE public.demands ADD COLUMN data_atendimento DATE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='demands' AND table_schema='public' AND column_name='prazo_retorno_dias') THEN
+      ALTER TABLE public.demands ADD COLUMN prazo_retorno_dias INTEGER DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='demands' AND table_schema='public' AND column_name='data_prevista_retorno') THEN
+      ALTER TABLE public.demands ADD COLUMN data_prevista_retorno DATE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='demands' AND table_schema='public' AND column_name='retorno_realizado') THEN
+      ALTER TABLE public.demands ADD COLUMN retorno_realizado BOOLEAN DEFAULT false;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='demands' AND table_schema='public' AND column_name='observacoes') THEN
+      ALTER TABLE public.demands ADD COLUMN observacoes TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='demands' AND table_schema='public' AND column_name='google_event_id') THEN
+      ALTER TABLE public.demands ADD COLUMN google_event_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='demands' AND table_schema='public' AND column_name='files') THEN
+      ALTER TABLE public.demands ADD COLUMN files JSONB DEFAULT '[]';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='demands' AND table_schema='public' AND column_name='created_at') THEN
+      ALTER TABLE public.demands ADD COLUMN created_at TIMESTAMPTZ DEFAULT now();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='demands' AND table_schema='public' AND column_name='updated_at') THEN
+      ALTER TABLE public.demands ADD COLUMN updated_at TIMESTAMPTZ DEFAULT now();
+    END IF;
+  END IF;
+
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='createdAt') THEN
     ALTER TABLE profiles RENAME COLUMN "createdAt" TO created_at;
   END IF;
@@ -300,3 +347,37 @@ INSERT INTO registrations (nome_completo, cep, logradouro, numero, bairro, cidad
 VALUES 
 ('João Silva', '60123-456', 'Rua Exemplo', '100', 'Centro', 'Fortaleza', 'CE', '1985-10-15', 'M', 'Infraestrutura', 'João Silva', 'joao@email.com', '@joao_exemplo', now())
 ON CONFLICT DO NOTHING;
+
+-- Tabela de demandas (demands) relacional
+CREATE TABLE IF NOT EXISTS public.demands (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  registration_id UUID NOT NULL REFERENCES public.registrations(id) ON DELETE CASCADE,
+  assunto TEXT NOT NULL,
+  data_pedido DATE NOT NULL,
+  atendido BOOLEAN DEFAULT false,
+  data_atendimento DATE,
+  prazo_retorno_dias INTEGER DEFAULT 0,
+  data_prevista_retorno DATE,
+  retorno_realizado BOOLEAN DEFAULT false,
+  observacoes TEXT,
+  google_event_id TEXT,
+  files JSONB DEFAULT '[]',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Habilitar RLS para tabela de demandas
+ALTER TABLE public.demands ENABLE ROW LEVEL SECURITY;
+
+-- Criar política de acesso total para usuários autenticados na tabela demands
+DROP POLICY IF EXISTS "Acesso total usuários autenticados na tabela demands" ON public.demands;
+CREATE POLICY "Acesso total usuários autenticados na tabela demands" ON public.demands
+  FOR ALL
+  USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');
+
+-- Criar índices de busca para demandas
+CREATE INDEX IF NOT EXISTS idx_demands_registration_id ON public.demands(registration_id);
+CREATE INDEX IF NOT EXISTS idx_demands_atendido ON public.demands(atendido);
+CREATE INDEX IF NOT EXISTS idx_demands_retorno_realizado ON public.demands(retorno_realizado);
+

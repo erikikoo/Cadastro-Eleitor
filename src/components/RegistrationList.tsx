@@ -53,6 +53,114 @@ export function RegistrationList({ data, onRefresh, onEdit }: RegistrationListPr
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSavingDemand, setIsSavingDemand] = useState(false);
   const [isAddingDemand, setIsAddingDemand] = useState(false);
+
+  // Isolated post-contact states
+  const [postContactElector, setPostContactElector] = useState<Registration | null>(null);
+  const [postContactForm, setPostContactForm] = useState({
+    data_contato: '',
+    observacoes: '',
+    syncGoogle: true
+  });
+  const [schedulingNextElector, setSchedulingNextElector] = useState<Registration | null>(null);
+  const [schedulingForm, setSchedulingForm] = useState({
+    intervalo_dias: 30,
+    data_proximo: '',
+    syncGoogle: true
+  });
+
+  const handleOpenPostContact = (item: Registration) => {
+    setPostContactElector(item);
+    setPostContactForm({
+      data_contato: new Date().toISOString().split('T')[0],
+      observacoes: '',
+      syncGoogle: true
+    });
+  };
+
+  const handleSavePostContact = async () => {
+    if (!postContactElector) return;
+
+    try {
+      // 1. Mark current scheduled contact as completed (clear current date)
+      const updatedRegistration: Registration = {
+        ...postContactElector,
+        lembrete_contato_ativo: false,
+        data_proximo_contato: undefined,
+        atualizado_por: profile?.full_name || 'Sistema',
+        updated_at: new Date().toISOString()
+      };
+
+      await saveRegistration(updatedRegistration);
+      toast.success('Baixa de pós-contato realizada com sucesso!');
+      
+      const completedElector = { ...updatedRegistration };
+      setPostContactElector(null);
+
+      // Open scheduling trigger modal immediately
+      setSchedulingNextElector(completedElector);
+      const defaultInterval = completedElector.intervalo_contato_dias || 30;
+      const nextDate = new Date();
+      nextDate.setDate(nextDate.getDate() + defaultInterval);
+      
+      setSchedulingForm({
+        intervalo_dias: defaultInterval,
+        data_proximo: nextDate.toISOString().split('T')[0],
+        syncGoogle: true
+      });
+      
+    } catch (error) {
+      console.error('Error saving post contact:', error);
+      toast.error('Erro ao registrar baixa de pós-contato.');
+    }
+  };
+
+  const handleSaveNewSchedule = async () => {
+    if (!schedulingNextElector) return;
+
+    setIsSyncing(true);
+    try {
+      const updatedRegistration: Registration = {
+        ...schedulingNextElector,
+        lembrete_contato_ativo: true,
+        intervalo_contato_dias: schedulingForm.intervalo_dias,
+        data_proximo_contato: schedulingForm.data_proximo,
+        atualizado_por: profile?.full_name || 'Sistema',
+        updated_at: new Date().toISOString()
+      };
+
+      let finalRegistration = { ...updatedRegistration };
+
+      if (schedulingForm.syncGoogle) {
+        const contactResult = await googleCalendarService.createPostContactEvent(updatedRegistration, profile);
+        if (contactResult.success && contactResult.data?.id) {
+          finalRegistration.google_contact_event_id = contactResult.data.id;
+          toast.success('Agendamento sincronizado no Google Agenda!');
+        } else if (!contactResult.success) {
+          toast.warning(`Salvo localmente, mas erro ao sincronizar no Google: ${contactResult.error}`);
+        }
+      }
+
+      await saveRegistration(finalRegistration);
+      toast.success('Novo agendamento de contato salvo!');
+      
+      setSchedulingNextElector(null);
+      onRefresh();
+      
+      if (selectedItem?.id === finalRegistration.id) {
+        setSelectedItem(finalRegistration);
+      }
+    } catch (error) {
+      console.error('Error saving schedule:', error);
+      toast.error('Erro ao salvar agendamento.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleSkipScheduling = () => {
+    setSchedulingNextElector(null);
+    onRefresh();
+  };
   const [filters, setFilters] = useState({
     bairro: '',
     cidade: '',
@@ -617,6 +725,22 @@ export function RegistrationList({ data, onRefresh, onEdit }: RegistrationListPr
                           );
                       })()}
                     </div>
+                    {/* Baixa de Pós-contato Isolado - Mobile */}
+                    {(!item.demands || !Array.isArray(item.demands) || item.demands.length === 0) && (
+                      <div className="mt-3 pt-2.5 border-t border-slate-100/50 w-full flex justify-end">
+                        <Button
+                          size="sm"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] py-1 h-7 rounded gap-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenPostContact(item);
+                          }}
+                        >
+                          <CheckCircle2 className="h-3 w-3" />
+                          Dar Baixa Pós-Contato
+                        </Button>
+                      </div>
+                    )}
                   </div>
                   <span className="text-slate-600 font-bold">{item.responsavel}</span>
                 </div>
@@ -763,6 +887,20 @@ export function RegistrationList({ data, onRefresh, onEdit }: RegistrationListPr
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        {(!item.demands || !Array.isArray(item.demands) || item.demands.length === 0) && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 px-2.5 text-[10px] font-bold text-emerald-600 border-emerald-200 hover:bg-emerald-50 gap-1.5 flex shrink-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenPostContact(item);
+                            }}
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            Baixar Pós-Contato
+                          </Button>
+                        )}
                         <Button 
                           variant="ghost" 
                           size="icon" 
@@ -1513,6 +1651,28 @@ export function RegistrationList({ data, onRefresh, onEdit }: RegistrationListPr
                       </div>
                     )}
 
+                    {(!selectedItem.demands || !Array.isArray(selectedItem.demands) || selectedItem.demands.length === 0) && (
+                      <div className="p-3 rounded-lg border bg-emerald-50/50 border-emerald-100 flex flex-col gap-2">
+                        <div className="flex items-center gap-2 font-bold text-[10px] uppercase text-emerald-800">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                          Fluxo de Pós-Contato Isolado
+                        </div>
+                        <p className="text-[9px] text-slate-500 leading-relaxed">
+                          Este eleitor não possui demandas cadastradas. Registre o contato direto realizado para manter o relacionamento atualizado.
+                        </p>
+                        <Button
+                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-8 gap-1.5 shadow-sm rounded-lg"
+                          onClick={() => {
+                            setSelectedItem(null);
+                            handleOpenPostContact(selectedItem);
+                          }}
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Dar Baixa no Pós-Contato
+                        </Button>
+                      </div>
+                    )}
+
                     <div className="p-3 rounded-lg border bg-green-50/50 border-green-100">
                       <div className="flex items-center gap-2 text-green-700 mb-1">
                         <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
@@ -1536,6 +1696,134 @@ export function RegistrationList({ data, onRefresh, onEdit }: RegistrationListPr
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL 1: REGISTRAR BAIXA DE PÓS-CONTATO ISOLADA */}
+      <Dialog open={postContactElector !== null} onOpenChange={() => setPostContactElector(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 font-bold flex items-center gap-2">
+              <Phone className="h-5 w-5 text-emerald-600" />
+              Baixa de Pós-Contato Isolada
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Registre a conclusão do contato com o eleitor <strong>{postContactElector?.nome_completo}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-600">Data do Contato</Label>
+              <Input
+                type="date"
+                value={postContactForm.data_contato}
+                onChange={(e) => setPostContactForm({ ...postContactForm, data_contato: e.target.value })}
+                className="h-10 text-slate-800 font-semibold"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-600">Resumo / Observações da Conversa</Label>
+              <textarea
+                placeholder="Ex: Conversamos sobre o asfalto da rua, ele agradeceu o retorno..."
+                value={postContactForm.observacoes}
+                onChange={(e) => setPostContactForm({ ...postContactForm, observacoes: e.target.value })}
+                rows={4}
+                className="flex min-h-[80px] w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 border-t pt-4">
+            <Button variant="ghost" size="sm" onClick={() => setPostContactElector(null)}>
+              Cancelar
+            </Button>
+            <Button 
+              size="sm" 
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold" 
+              onClick={handleSavePostContact}
+            >
+              Confirmar e Avançar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL 2: GATILHO DE NOVO AGENDAMENTO DE PÓS-CONTATO */}
+      <Dialog open={schedulingNextElector !== null} onOpenChange={() => setSchedulingNextElector(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 font-bold flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-blue-600" />
+              Agendar Próximo Contato?
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Imediatamente após a baixa, defina uma nova data para conversar com <strong>{schedulingNextElector?.nome_completo}</strong> novamente.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-3 bg-blue-50/50 rounded-2xl border border-blue-100 p-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-700">Intervalo Recomendado (Dias)</Label>
+              <div className="flex items-center gap-3">
+                <Input
+                  type="number"
+                  min={1}
+                  value={schedulingForm.intervalo_dias}
+                  onChange={(e) => {
+                    const dias = parseInt(e.target.value) || 30;
+                    const nextDate = new Date();
+                    nextDate.setDate(nextDate.getDate() + dias);
+                    setSchedulingForm({
+                      ...schedulingForm,
+                      intervalo_dias: dias,
+                      data_proximo: nextDate.toISOString().split('T')[0]
+                    });
+                  }}
+                  className="h-10 w-24 text-center font-bold text-slate-800 bg-white"
+                />
+                <span className="text-xs text-slate-500">dias de intervalo periódico</span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-700">Data Agendada</Label>
+              <Input
+                type="date"
+                value={schedulingForm.data_proximo}
+                onChange={(e) => setSchedulingForm({ ...schedulingForm, data_proximo: e.target.value })}
+                className="h-10 text-slate-800 font-bold bg-white"
+              />
+            </div>
+
+            <div className="pt-2 border-t border-blue-100 flex items-center gap-2">
+              <Checkbox 
+                id="schedule-sync-google"
+                checked={schedulingForm.syncGoogle}
+                onCheckedChange={(checked) => setSchedulingForm({ ...schedulingForm, syncGoogle: !!checked })}
+              />
+              <Label htmlFor="schedule-sync-google" className="text-xs font-bold text-blue-700 cursor-pointer flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5" />
+                Sincronizar no Google Agenda
+              </Label>
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center border-t pt-4 w-full">
+            <Button variant="ghost" size="sm" onClick={() => handleSkipScheduling()}>
+              Não agendar agora
+            </Button>
+            <Button 
+              size="sm" 
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold" 
+              onClick={handleSaveNewSchedule}
+              disabled={isSyncing}
+            >
+              {isSyncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Confirmar Agendamento
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

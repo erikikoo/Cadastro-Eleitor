@@ -85,6 +85,42 @@ export const getRegistrations = async (): Promise<Registration[]> => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      
+      // Tentar buscar da tabela demandas separada para garantir a consistência relacional
+      try {
+        const { data: demandsData, error: demandsError } = await supabase
+          .from('demands')
+          .select('*');
+
+        if (!demandsError && demandsData) {
+          const demandsByRegId = demandsData.reduce((acc: any, demand: any) => {
+            const regId = demand.registration_id;
+            if (!acc[regId]) acc[regId] = [];
+            acc[regId].push({
+              id: demand.id,
+              assunto: demand.assunto,
+              data_pedido: demand.data_pedido,
+              atendido: demand.atendido,
+              data_atendimento: demand.data_atendimento,
+              prazo_retorno_dias: demand.prazo_retorno_dias,
+              data_prevista_retorno: demand.data_prevista_retorno,
+              retorno_realizado: demand.retorno_realizado,
+              observacoes: demand.observacoes,
+              google_event_id: demand.google_event_id,
+              files: demand.files || []
+            });
+            return acc;
+          }, {});
+
+          return (data || []).map((reg: any) => ({
+            ...reg,
+            demands: demandsByRegId[reg.id] || reg.demands || []
+          }));
+        }
+      } catch (err) {
+        console.warn('Could not load separate demands table, falling back to JSON format:', err);
+      }
+
       return data || [];
     } catch (error) {
       console.error('Supabase error, falling back to local storage:', error);
@@ -111,6 +147,56 @@ export const saveRegistration = async (registration: Registration) => {
         }
         throw error;
       }
+
+      // Sincronizar com a tabela de demandas (demands) relacional se disponível
+      if (registration.demands && Array.isArray(registration.demands)) {
+        try {
+          // 1. Obter IDs existentes no banco para este registro para deletar as removidas
+          const { data: existingDemands, error: getDemandsErr } = await supabase
+            .from('demands')
+            .select('id')
+            .eq('registration_id', registration.id);
+
+          if (!getDemandsErr && existingDemands) {
+            const currentDemandIds = registration.demands.map(d => d.id);
+            const demandsToDelete = existingDemands
+              .filter(d => !currentDemandIds.includes(d.id))
+              .map(d => d.id);
+
+            if (demandsToDelete.length > 0) {
+              await supabase
+                .from('demands')
+                .delete()
+                .in('id', demandsToDelete);
+            }
+          }
+
+          // 2. Inserir ou Atualizar as demandas atuais
+          for (const demand of registration.demands) {
+            const demandToInsert = {
+              id: demand.id,
+              registration_id: registration.id,
+              assunto: demand.assunto,
+              data_pedido: demand.data_pedido,
+              atendido: demand.atendido,
+              data_atendimento: demand.data_atendimento || null,
+              prazo_retorno_dias: demand.prazo_retorno_dias || 0,
+              data_prevista_retorno: demand.data_prevista_retorno || null,
+              retorno_realizado: demand.retorno_realizado || false,
+              observacoes: demand.observacoes || '',
+              google_event_id: demand.google_event_id || null,
+              files: demand.files || []
+            };
+
+            await supabase
+              .from('demands')
+              .upsert(demandToInsert);
+          }
+        } catch (demandErr) {
+          console.warn('Error syncing to separate demands table, data is still saved in registrations JSON:', demandErr);
+        }
+      }
+
       return;
     } catch (error: any) {
       console.error('Supabase error, saving locally:', error);

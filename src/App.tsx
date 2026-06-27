@@ -667,7 +667,7 @@ function AppContent() {
   // Filter registrations based on role (vereador, chefe_de_gabinete, and assessor see all)
   const displayedRegistrations = isHighLevel 
     ? registrations 
-    : registrations.filter(r => r.responsavel === (profile?.full_name || user?.email?.split('@')[0]));
+    : registrations.filter(r => r.created_by === user?.id || r.responsavel === (profile?.full_name || user?.email?.split('@')[0]));
 
   useEffect(() => {
     if (user) {
@@ -775,17 +775,15 @@ function AppContent() {
           </div>
           
           <div className="flex items-center gap-4">
-            {profile?.role !== 'lider' && (
-              <Button 
-                size="sm" 
-                variant="outline"
-                className="hidden sm:flex border-blue-200 text-blue-600 hover:bg-blue-50 rounded-lg gap-2"
-                onClick={() => setActiveTab('quick')}
-              >
-                <Zap className="h-4 w-4" />
-                Cadastro Rápido
-              </Button>
-            )}
+            <Button 
+              size="sm" 
+              variant="outline"
+              className="hidden sm:flex border-blue-200 text-blue-600 hover:bg-blue-50 rounded-lg gap-2"
+              onClick={() => setActiveTab('quick')}
+            >
+              <Zap className="h-4 w-4" />
+              Cadastro Rápido
+            </Button>
             <Button 
               size="sm" 
               className="hidden sm:flex bg-blue-600 hover:bg-blue-700 text-white rounded-lg gap-2"
@@ -807,7 +805,7 @@ function AppContent() {
                 </Button>
                 <div className="hidden lg:flex items-center gap-2 text-sm text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200">
                   <Users className="h-4 w-4" />
-                  <span>{registrations.length} cadastros ativos</span>
+                  <span>{displayedRegistrations.length} cadastros ativos</span>
                 </div>
               </div>
             
@@ -962,12 +960,10 @@ function AppContent() {
                     return null;
                   })()}
                 </TabsTrigger>
-                {profile?.role !== 'lider' && (
-                  <TabsTrigger value="quick" className="rounded-lg py-2 px-3 md:px-4 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md">
-                    <Zap className="h-4 w-4 md:mr-2" />
-                    <span className="hidden md:inline">Express</span>
-                  </TabsTrigger>
-                )}
+                <TabsTrigger value="quick" className="rounded-lg py-2 px-3 md:px-4 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md">
+                  <Zap className="h-4 w-4 md:mr-2" />
+                  <span className="hidden md:inline">Express</span>
+                </TabsTrigger>
                 <TabsTrigger value="new" className="rounded-lg py-2 px-3 md:px-4 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md">
                   <PlusCircle className="h-4 w-4 md:mr-2" />
                   <span className="hidden md:inline">{editingRegistration ? 'Editar' : 'Completo'}</span>
@@ -1012,21 +1008,19 @@ function AppContent() {
             <RegistrationList data={displayedRegistrations} onRefresh={refreshData} onEdit={handleEdit} />
           </TabsContent>
 
-          {profile?.role !== 'lider' && (
-            <TabsContent value="quick" className="outline-none">
-              <div className="max-w-4xl mx-auto">
-                <QuickRegistrationForm 
-                  onSuccess={() => {
-                    refreshData();
-                    setActiveTab('list');
-                  }}
-                  onCancel={() => {
-                    setActiveTab('list');
-                  }}
-                />
-              </div>
-            </TabsContent>
-          )}
+          <TabsContent value="quick" className="outline-none">
+            <div className="max-w-4xl mx-auto">
+              <QuickRegistrationForm 
+                onSuccess={() => {
+                  refreshData();
+                  setActiveTab('list');
+                }}
+                onCancel={() => {
+                  setActiveTab('list');
+                }}
+              />
+            </div>
+          </TabsContent>
 
           <TabsContent value="new" className="outline-none">
             <div className="max-w-4xl mx-auto">

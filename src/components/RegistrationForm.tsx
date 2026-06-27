@@ -249,6 +249,7 @@ export function RegistrationForm({ onSuccess, onCancel, initialData }: Registrat
       sexo: values.sexo as any,
       id: initialData?.id || crypto.randomUUID(),
       created_at: initialData?.created_at || new Date().toISOString(),
+      created_by: initialData?.created_by || user?.id,
       complemento: values.complemento || '',
       data_proximo_contato,
       assunto: (values.demands && values.demands.length > 0) ? values.demands[0].assunto : 'Nenhum assunto',

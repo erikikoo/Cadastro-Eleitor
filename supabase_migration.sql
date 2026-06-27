@@ -49,6 +49,9 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 4. Altera com segurança a chave estrangeira em registrations para ON DELETE SET NULL
+-- Primeiro, garante que a coluna created_by existe na tabela registrations
+ALTER TABLE public.registrations ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL;
+
 -- Isso permite deletar usuários do auth.users sem causar violação de chave estrangeira nas tabelas de registro
 DO $$
 DECLARE
@@ -94,3 +97,52 @@ CREATE TRIGGER on_profile_deleted
 
 -- 6. Adiciona suporte a soft-delete para perfis (operadores)
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false;
+
+-- 7. Criar a tabela de demandas (demands) relacional
+CREATE TABLE IF NOT EXISTS public.demands (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  registration_id UUID NOT NULL REFERENCES public.registrations(id) ON DELETE CASCADE,
+  assunto TEXT NOT NULL,
+  data_pedido DATE NOT NULL,
+  atendido BOOLEAN DEFAULT false,
+  data_atendimento DATE,
+  prazo_retorno_dias INTEGER DEFAULT 0,
+  data_prevista_retorno DATE,
+  retorno_realizado BOOLEAN DEFAULT false,
+  observacoes TEXT,
+  google_event_id TEXT,
+  files JSONB DEFAULT '[]',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Garantir todas as colunas necessárias na tabela demands se ela já existia antes
+ALTER TABLE public.demands ADD COLUMN IF NOT EXISTS registration_id UUID REFERENCES public.registrations(id) ON DELETE CASCADE;
+ALTER TABLE public.demands ADD COLUMN IF NOT EXISTS assunto TEXT NOT NULL DEFAULT 'Geral';
+ALTER TABLE public.demands ADD COLUMN IF NOT EXISTS data_pedido DATE NOT NULL DEFAULT CURRENT_DATE;
+ALTER TABLE public.demands ADD COLUMN IF NOT EXISTS atendido BOOLEAN DEFAULT false;
+ALTER TABLE public.demands ADD COLUMN IF NOT EXISTS data_atendimento DATE;
+ALTER TABLE public.demands ADD COLUMN IF NOT EXISTS prazo_retorno_dias INTEGER DEFAULT 0;
+ALTER TABLE public.demands ADD COLUMN IF NOT EXISTS data_prevista_retorno DATE;
+ALTER TABLE public.demands ADD COLUMN IF NOT EXISTS retorno_realizado BOOLEAN DEFAULT false;
+ALTER TABLE public.demands ADD COLUMN IF NOT EXISTS observacoes TEXT;
+ALTER TABLE public.demands ADD COLUMN IF NOT EXISTS google_event_id TEXT;
+ALTER TABLE public.demands ADD COLUMN IF NOT EXISTS files JSONB DEFAULT '[]';
+ALTER TABLE public.demands ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();
+ALTER TABLE public.demands ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
+
+-- Habilitar RLS para tabela de demandas
+ALTER TABLE public.demands ENABLE ROW LEVEL SECURITY;
+
+-- Criar política de acesso total para usuários autenticados na tabela demands
+DROP POLICY IF EXISTS "Acesso total usuários autenticados na tabela demands" ON public.demands;
+CREATE POLICY "Acesso total usuários autenticados na tabela demands" ON public.demands
+  FOR ALL
+  USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');
+
+-- Criar índices de busca para demandas
+CREATE INDEX IF NOT EXISTS idx_demands_registration_id ON public.demands(registration_id);
+CREATE INDEX IF NOT EXISTS idx_demands_atendido ON public.demands(atendido);
+CREATE INDEX IF NOT EXISTS idx_demands_retorno_realizado ON public.demands(retorno_realizado);
+
