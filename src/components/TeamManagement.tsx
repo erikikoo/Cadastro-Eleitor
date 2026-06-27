@@ -124,7 +124,7 @@ export function TeamManagement() {
       });
 
       // Create the user in Auth
-      const { data: authData, error: authError } = await tempSupabase.auth.signUp({
+      let authResult = await tempSupabase.auth.signUp({
         email: newUser.email,
         password: newUser.password,
         options: {
@@ -134,6 +134,28 @@ export function TeamManagement() {
           }
         }
       });
+
+      // Se der erro de banco de dados (geralmente por conta do ENUM do trigger), tenta fallback sem metadados de papel para garantir a criação
+      const isDbError = authResult.error && (
+        authResult.error.message.toLowerCase().includes('database error') || 
+        authResult.error.message.toLowerCase().includes('erro de banco')
+      );
+
+      if (isDbError) {
+        console.warn('Database error during signup, attempting fallback signup with default "lider" role metadata...');
+        authResult = await tempSupabase.auth.signUp({
+          email: newUser.email,
+          password: newUser.password,
+          options: {
+            data: {
+              full_name: newUser.fullName,
+              role: 'lider', // sempre existe no enum de papéis e garante o sucesso do trigger
+            }
+          }
+        });
+      }
+
+      const { data: authData, error: authError } = authResult;
 
       if (authError) {
         const isAuthRegError = authError.message === 'User already registered' || authError.message.includes('already registered');
@@ -159,11 +181,28 @@ export function TeamManagement() {
 
         if (profileError) {
           console.error('DETAILED_PROFILE_ERROR:', profileError);
-          console.warn('Profile creation sync warning (this is often normal due to RLS):', profileError);
-          // Não lançamos erro aqui para não bloquear o sucesso da criação no Auth
+          console.warn('Profile creation sync warning, attempting fallback to "lider" role...', profileError);
+          
+          // Se falhou por conta do ENUM do perfil (por ex, acessor/assessor), tenta com lider
+          const { error: fallbackProfileError } = await supabase
+            .from('profiles')
+            .upsert({ 
+              id: authData.user.id,
+              role: 'lider',
+              full_name: newUser.fullName,
+              email: newUser.email,
+              created_at: new Date().toISOString()
+            });
+
+          if (fallbackProfileError) {
+            console.error('Fallback profile creation failed too:', fallbackProfileError);
+          } else {
+            toast.warning(`Usuário criado com perfil 'Líder'. Para habilitar o papel de '${newUser.role}', execute o script 'supabase_migration.sql' no painel SQL do seu Supabase.`, { duration: 8000 });
+          }
+        } else {
+          toast.success(`Operador ${newUser.email} registrado! O sistema enviou um e-mail de confirmação obrigatório.`, { id: toastId });
         }
 
-        toast.success(`Operador ${newUser.email} registrado! O sistema enviou um e-mail de confirmação obrigatório.`, { id: toastId });
         setNewUser({ email: '', password: '', confirmPassword: '', fullName: '', role: 'acessor' });
         fetchProfiles();
       }

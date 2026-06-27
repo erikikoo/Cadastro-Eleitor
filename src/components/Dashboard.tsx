@@ -82,7 +82,7 @@ export function Dashboard({ data }: DashboardProps) {
     }
 
     // Check specific demands status
-    if (reg.demands) {
+    if (reg.demands && Array.isArray(reg.demands)) {
       reg.demands.forEach(d => {
         if (d.atendido && !d.retorno_realizado && d.data_prevista_retorno) {
           if (d.data_prevista_retorno === today) acc.today++;

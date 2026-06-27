@@ -276,24 +276,26 @@ export function RegistrationForm({ onSuccess, onCancel, initialData }: Registrat
     try {
       await saveRegistration(newRegistration);
       
-      // Sincronizar com Google Agenda se solicitado
-      if (syncWithGoogle) {
+      // Sincronizar com Google Agenda se solicitado ou se já existe um evento vinculado para garantir que alterações de data sejam propagadas
+      if (syncWithGoogle || newRegistration.google_contact_event_id || (newRegistration.demands && newRegistration.demands.some(d => d.google_event_id))) {
         let syncedCount = 0;
         let needsUpdate = false;
         let fallbackDetected = false;
 
         // 1. Sync post-contact event for the elector
         if (newRegistration.lembrete_contato_ativo && newRegistration.data_proximo_contato) {
-          const contactResult = await googleCalendarService.createPostContactEvent(newRegistration, profile);
-          if (contactResult.success && contactResult.data?.id) {
-            newRegistration.google_contact_event_id = contactResult.data.id;
-            needsUpdate = true;
-            syncedCount++;
-            if (contactResult.fallbackToPrimaryUsed) {
-              fallbackDetected = true;
+          if (syncWithGoogle || newRegistration.google_contact_event_id) {
+            const contactResult = await googleCalendarService.createPostContactEvent(newRegistration, profile);
+            if (contactResult.success && contactResult.data?.id) {
+              newRegistration.google_contact_event_id = contactResult.data.id;
+              needsUpdate = true;
+              syncedCount++;
+              if (contactResult.fallbackToPrimaryUsed) {
+                fallbackDetected = true;
+              }
+            } else if (!contactResult.success) {
+              console.warn('[Google Sync] Could not sync post-contact event:', contactResult.error);
             }
-          } else if (!contactResult.success) {
-            console.warn('[Google Sync] Could not sync post-contact event:', contactResult.error);
           }
         }
 
@@ -302,20 +304,22 @@ export function RegistrationForm({ onSuccess, onCancel, initialData }: Registrat
           const updatedDemands = [...newRegistration.demands];
           for (let i = 0; i < updatedDemands.length; i++) {
             const demand = updatedDemands[i];
-            const result = await googleCalendarService.createEvent(newRegistration, demand, profile);
-            if (result.success && result.data?.id) {
-              updatedDemands[i] = {
-                ...demand,
-                google_event_id: result.data.id
-              };
-              needsUpdate = true;
-              syncedCount++;
-              if (result.fallbackToPrimaryUsed) {
-                fallbackDetected = true;
+            if (syncWithGoogle || demand.google_event_id) {
+              const result = await googleCalendarService.createEvent(newRegistration, demand, profile);
+              if (result.success && result.data?.id) {
+                updatedDemands[i] = {
+                  ...demand,
+                  google_event_id: result.data.id
+                };
+                needsUpdate = true;
+                syncedCount++;
+                if (result.fallbackToPrimaryUsed) {
+                  fallbackDetected = true;
+                }
+              } else if (!result.success) {
+                toast.error(`Erro ao sincronizar demanda no Google: ${result.error}`);
+                break;
               }
-            } else if (!result.success) {
-              toast.error(`Erro ao sincronizar demanda no Google: ${result.error}`);
-              break;
             }
           }
           newRegistration.demands = updatedDemands;

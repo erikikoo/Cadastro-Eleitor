@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS registrations (
   lembrete_contato_ativo BOOLEAN DEFAULT true,
   intervalo_contato_dias INTEGER DEFAULT 30,
   data_proximo_contato DATE,
+  google_contact_event_id TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
   created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   atualizado_por TEXT,
@@ -152,6 +153,10 @@ BEGIN
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='registrations' AND column_name='data_proximo_contato') THEN
     ALTER TABLE registrations ADD COLUMN data_proximo_contato DATE;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='registrations' AND column_name='google_contact_event_id') THEN
+    ALTER TABLE registrations ADD COLUMN google_contact_event_id TEXT;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='registrations' AND column_name='atualizado_por') THEN
@@ -291,7 +296,7 @@ BEGIN
 END $$;
 
 -- Inserção de dados de teste (opcional)
-INSERT INTO registrations (cep, logradouro, numero, bairro, cidade, estado, "dataNascimento", sexo, assunto, responsavel, email, instagram, created_at)
+INSERT INTO registrations (nome_completo, cep, logradouro, numero, bairro, cidade, estado, "dataNascimento", sexo, assunto, responsavel, email, instagram, created_at)
 VALUES 
-('60123-456', 'Rua Exemplo', '100', 'Centro', 'Fortaleza', 'CE', '1985-10-15', 'M', 'Infraestrutura', 'João Silva', 'joao@email.com', '@joao_exemplo', now())
+('João Silva', '60123-456', 'Rua Exemplo', '100', 'Centro', 'Fortaleza', 'CE', '1985-10-15', 'M', 'Infraestrutura', 'João Silva', 'joao@email.com', '@joao_exemplo', now())
 ON CONFLICT DO NOTHING;

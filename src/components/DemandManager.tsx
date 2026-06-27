@@ -95,7 +95,7 @@ export const DemandManager: React.FC<DemandManagerProps> = ({ registrations, onR
 
   // Extrair todas as demandas de todos os registros
   const allDemands: FlattenedDemand[] = registrations.flatMap(reg => 
-    (reg.demands || []).map(demand => ({
+    (reg.demands && Array.isArray(reg.demands) ? reg.demands : []).map(demand => ({
       ...demand,
       registrationId: reg.id,
       registrationName: reg.nome_completo,
@@ -134,7 +134,7 @@ export const DemandManager: React.FC<DemandManagerProps> = ({ registrations, onR
 
   const handleToggleReturn = async (regId: string, demandId: string) => {
     const registration = registrations.find(r => r.id === regId);
-    if (!registration || !registration.demands) return;
+    if (!registration || !registration.demands || !Array.isArray(registration.demands)) return;
 
     const demand = registration.demands.find(d => d.id === demandId);
     if (!demand) return;
@@ -177,7 +177,7 @@ export const DemandManager: React.FC<DemandManagerProps> = ({ registrations, onR
     const { regId, demandId } = concludingDemand;
     
     const registration = registrations.find(r => r.id === regId);
-    if (!registration || !registration.demands) return;
+    if (!registration || !registration.demands || !Array.isArray(registration.demands)) return;
 
     const today = new Date().toISOString().split('T')[0];
     const updatedDemands = registration.demands.map(d => {
@@ -196,7 +196,7 @@ export const DemandManager: React.FC<DemandManagerProps> = ({ registrations, onR
     let targetDemand = updatedDemands.find(d => d.id === demandId);
     let finalDemands = updatedDemands;
 
-    if (conclusionForm.syncGoogle && targetDemand) {
+    if ((conclusionForm.syncGoogle || targetDemand.google_event_id) && targetDemand) {
       try {
         setIsSyncing(true);
         const result = await googleCalendarService.createEvent(registration, targetDemand, profile);
@@ -204,7 +204,7 @@ export const DemandManager: React.FC<DemandManagerProps> = ({ registrations, onR
           finalDemands = updatedDemands.map(d => 
             d.id === demandId ? { ...d, google_event_id: result.data.id } : d
           );
-          toast.success('Evento criado no Google Agenda!');
+          toast.success('Evento sincronizado no Google Agenda!');
         } else {
           toast.error(`Erro Google: ${result.error}`);
         }
@@ -229,7 +229,7 @@ export const DemandManager: React.FC<DemandManagerProps> = ({ registrations, onR
 
   const handleToggleReturnManual = (demand: FlattenedDemand) => {
     const registration = registrations.find(r => r.id === demand.registrationId);
-    if (!registration || !registration.demands) return;
+    if (!registration || !registration.demands || !Array.isArray(registration.demands)) return;
 
     setConfirmConfig({
       isOpen: true,
@@ -268,12 +268,12 @@ export const DemandManager: React.FC<DemandManagerProps> = ({ registrations, onR
       variant: 'info',
       onConfirm: async () => {
         const registration = registrations.find(r => r.id === editingDemand.regId);
-        if (!registration || !registration.demands) return;
+        if (!registration || !registration.demands || !Array.isArray(registration.demands)) return;
 
         const { registrationId, registrationName, registrationBairro, syncGoogle, ...cleanDemand } = editForm as any;
         let updatedDemandWithId = { ...cleanDemand };
 
-        if (syncGoogle) {
+        if (syncGoogle || cleanDemand.google_event_id) {
           try {
             setIsSyncing(true);
             const syncResult = await googleCalendarService.createEvent(registration, cleanDemand, profile);
@@ -314,7 +314,7 @@ export const DemandManager: React.FC<DemandManagerProps> = ({ registrations, onR
       variant: 'danger',
       onConfirm: async () => {
         const registration = registrations.find(r => r.id === regId);
-        if (!registration || !registration.demands) return;
+        if (!registration || !registration.demands || !Array.isArray(registration.demands)) return;
 
         const updatedDemands = registration.demands.filter(d => d.id !== demandId);
 
@@ -730,7 +730,8 @@ export const DemandManager: React.FC<DemandManagerProps> = ({ registrations, onR
                                     setIsSyncing(true);
                                     googleCalendarService.createEvent(registration, demand, profile).then(async (result) => {
                                       if (result.success && result.data?.id) {
-                                        const updatedDemands = (registration.demands || []).map(d => 
+                                        const currentDemands = Array.isArray(registration.demands) ? registration.demands : [];
+                                        const updatedDemands = currentDemands.map(d => 
                                           d.id === demand.id ? { ...d, google_event_id: result.data.id } : d
                                         );
                                         try {

@@ -98,7 +98,7 @@ export function RegistrationList({ data, onRefresh, onEdit }: RegistrationListPr
     }
 
     // 2. Check pending demands
-    if (registration.demands && registration.demands.length > 0) {
+    if (registration.demands && Array.isArray(registration.demands) && registration.demands.length > 0) {
       const pendingDemands = registration.demands.filter(d => d.atendido && !d.retorno_realizado && d.data_prevista_retorno);
       pendingDemands.forEach(d => {
         if (d.data_prevista_retorno) {
@@ -162,7 +162,7 @@ export function RegistrationList({ data, onRefresh, onEdit }: RegistrationListPr
 
   const handleToggleReturn = async (regId: string, demandId: string) => {
     const registration = data.find(r => r.id === regId);
-    if (!registration || !registration.demands) return;
+    if (!registration || !registration.demands || !Array.isArray(registration.demands)) return;
 
     const demand = registration.demands.find(d => d.id === demandId);
     if (!demand) return;
@@ -179,7 +179,7 @@ export function RegistrationList({ data, onRefresh, onEdit }: RegistrationListPr
     const { regId, demandId } = toggleReturnData;
     
     const registration = data.find(r => r.id === regId);
-    if (!registration || !registration.demands) return;
+    if (!registration || !registration.demands || !Array.isArray(registration.demands)) return;
 
     const updatedDemands = registration.demands.map(d => 
       d.id === demandId ? { ...d, retorno_realizado: !d.retorno_realizado } : d
@@ -205,7 +205,7 @@ export function RegistrationList({ data, onRefresh, onEdit }: RegistrationListPr
     const { regId, demandId } = concludingDemand;
 
     const registration = data.find(r => r.id === regId);
-    if (!registration || !registration.demands) return;
+    if (!registration || !registration.demands || !Array.isArray(registration.demands)) return;
 
     const today = new Date().toISOString().split('T')[0];
     
@@ -227,7 +227,7 @@ export function RegistrationList({ data, onRefresh, onEdit }: RegistrationListPr
     let targetDemand = updatedDemands.find(d => d.id === demandId);
     let finalDemands = updatedDemands;
 
-    if (conclusionForm.syncGoogle && targetDemand) {
+    if ((conclusionForm.syncGoogle || targetDemand.google_event_id) && targetDemand) {
       try {
         setIsSyncing(true);
         const result = await googleCalendarService.createEvent(updatedRegistration, targetDemand, profile);
@@ -235,7 +235,7 @@ export function RegistrationList({ data, onRefresh, onEdit }: RegistrationListPr
           finalDemands = updatedDemands.map(d => 
             d.id === demandId ? { ...d, google_event_id: result.data.id } : d
           );
-          toast.success('Evento criado no Google Agenda!');
+          toast.success('Evento sincronizado no Google Agenda!');
         } else {
           toast.error(`Erro Google: ${result.error}`);
         }
@@ -264,7 +264,7 @@ export function RegistrationList({ data, onRefresh, onEdit }: RegistrationListPr
 
   const handleSyncDemandToGoogle = async (regId: string, demandId: string) => {
     const registration = data.find(r => r.id === regId);
-    if (!registration || !registration.demands) return;
+    if (!registration || !registration.demands || !Array.isArray(registration.demands)) return;
 
     const demand = registration.demands.find(d => d.id === demandId);
     if (!demand) return;
@@ -324,7 +324,8 @@ export function RegistrationList({ data, onRefresh, onEdit }: RegistrationListPr
       files: (newDemandForm as any).files || []
     };
 
-    let finalDemands = [...(selectedItem.demands || []), demand];
+    const currentDemands = Array.isArray(selectedItem.demands) ? selectedItem.demands : [];
+    let finalDemands = [...currentDemands, demand];
     let finalDemand = { ...demand };
 
     if (newDemandForm.syncGoogle) {
@@ -332,7 +333,7 @@ export function RegistrationList({ data, onRefresh, onEdit }: RegistrationListPr
         const result = await googleCalendarService.createEvent(selectedItem, demand, profile);
         if (result.success && result.data?.id) {
           finalDemand.google_event_id = result.data.id;
-          finalDemands = [...(selectedItem.demands || []), finalDemand];
+          finalDemands = [...currentDemands, finalDemand];
           toast.success('Demanda sincronizada no Google Agenda');
         } else {
           toast.error(`Erro Google: ${result.error}`);
@@ -372,7 +373,7 @@ export function RegistrationList({ data, onRefresh, onEdit }: RegistrationListPr
 
     let updatedDemandWithId = { ...finalDemandForm };
 
-    if (editForm.syncGoogle) {
+    if (editForm.syncGoogle || finalDemandForm.google_event_id) {
       try {
         setIsSyncing(true);
         const result = await googleCalendarService.createEvent(selectedItem, finalDemandForm, profile);
@@ -387,7 +388,8 @@ export function RegistrationList({ data, onRefresh, onEdit }: RegistrationListPr
       }
     }
 
-    const updatedDemands = selectedItem.demands?.map(d => {
+    const currentDemands = Array.isArray(selectedItem.demands) ? selectedItem.demands : [];
+    const updatedDemands = currentDemands.map(d => {
       if (d.id === editingDemand.demandId) {
         return updatedDemandWithId;
       }
@@ -410,7 +412,7 @@ export function RegistrationList({ data, onRefresh, onEdit }: RegistrationListPr
 
   const deleteDemand = async (regId: string, demandId: string) => {
     const registration = data.find(r => r.id === regId) || selectedItem;
-    if (!registration || !registration.demands) return;
+    if (!registration || !registration.demands || !Array.isArray(registration.demands)) return;
 
     const updatedDemands = registration.demands.filter(d => d.id !== demandId);
     const updatedRegistration = { ...registration, demands: updatedDemands };
@@ -597,7 +599,7 @@ export function RegistrationList({ data, onRefresh, onEdit }: RegistrationListPr
                       {/* Retorno de Demanda - Mobile */}
                       {(() => {
                           const today = new Date().toISOString().split('T')[0];
-                          const pendingDemands = item.demands?.filter(d => d.atendido && !d.retorno_realizado && d.data_prevista_retorno);
+                          const pendingDemands = Array.isArray(item.demands) ? item.demands.filter(d => d.atendido && !d.retorno_realizado && d.data_prevista_retorno) : [];
                           if (!pendingDemands || pendingDemands.length === 0) return null;
                           
                           const sorted = [...pendingDemands].sort((a, b) => (a.data_prevista_retorno || '').localeCompare(b.data_prevista_retorno || ''));
@@ -730,7 +732,7 @@ export function RegistrationList({ data, onRefresh, onEdit }: RegistrationListPr
                         {/* Retorno de Demandas */}
                         {(() => {
                           const today = new Date().toISOString().split('T')[0];
-                          const pendingDemands = item.demands?.filter(d => d.atendido && !d.retorno_realizado && d.data_prevista_retorno);
+                          const pendingDemands = Array.isArray(item.demands) ? item.demands.filter(d => d.atendido && !d.retorno_realizado && d.data_prevista_retorno) : [];
                           if (!pendingDemands || pendingDemands.length === 0) return null;
 
                           // Sort to show the closest/most late one first
@@ -754,7 +756,7 @@ export function RegistrationList({ data, onRefresh, onEdit }: RegistrationListPr
                         })()}
 
                         {/* Se nenhum estiver ativo */}
-                        {!item.lembrete_contato_ativo && (!item.demands || item.demands.filter(d => d.atendido && !d.retorno_realizado && d.data_prevista_retorno).length === 0) && (
+                        {!item.lembrete_contato_ativo && (!item.demands || !Array.isArray(item.demands) || item.demands.filter(d => d.atendido && !d.retorno_realizado && d.data_prevista_retorno).length === 0) && (
                           <span className="text-xs text-slate-400 font-medium">-</span>
                         )}
                       </div>
@@ -997,7 +999,7 @@ export function RegistrationList({ data, onRefresh, onEdit }: RegistrationListPr
                       </div>
                     )}
 
-                    {selectedItem.demands && selectedItem.demands.length > 0 ? (
+                    {selectedItem.demands && Array.isArray(selectedItem.demands) && selectedItem.demands.length > 0 ? (
                       <div className="space-y-3">
                         {selectedItem.demands.map((demand) => {
                           const today = new Date().toISOString().split('T')[0];

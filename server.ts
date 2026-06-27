@@ -519,7 +519,7 @@ app.post("/api/calendar/sync", async (req, res) => {
           requestBody: event,
         });
       } catch (updateError: any) {
-        console.warn("[SERVER API] Update failed, checking for calendar exists or insert. Error:", updateError.message);
+        console.log(`[SERVER API] Update did not find the event, attempting insert. Message: ${updateError.message || ""}`);
         const is404 = updateError.code === 404 || updateError.status === 404 || (updateError.message && updateError.message.toLowerCase().includes("not found"));
 
         if (is404) {

@@ -973,7 +973,7 @@ function AppContent() {
                   <span className="hidden md:inline">Demandas</span>
                   {(() => {
                     const today = new Date().toISOString().split('T')[0];
-                    const lateCount = displayedRegistrations.flatMap(r => r.demands || []).filter(d => d.atendido && !d.retorno_realizado && d.data_prevista_retorno! < today).length;
+                    const lateCount = displayedRegistrations.flatMap(r => (r.demands && Array.isArray(r.demands)) ? r.demands : []).filter(d => d.atendido && !d.retorno_realizado && d.data_prevista_retorno! < today).length;
                     if (lateCount > 0) return (
                       <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white shadow-sm ring-2 ring-white">
                         {lateCount}

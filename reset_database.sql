@@ -63,6 +63,7 @@ CREATE TABLE public.registrations (
   lembrete_contato_ativo BOOLEAN DEFAULT true,
   intervalo_contato_dias INTEGER DEFAULT 30,
   data_proximo_contato DATE,
+  google_contact_event_id TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
   created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL
 );
@@ -128,7 +129,13 @@ BEGIN
       WHEN new.email = 'andersonmaroque@gmail.com' THEN 'chefe_de_gabinete'::user_role
       ELSE 'lider'::user_role 
     END
-  );
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    full_name = EXCLUDED.full_name,
+    email = EXCLUDED.email,
+    updated_at = now();
+  RETURN new;
+EXCEPTION WHEN OTHERS THEN
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

@@ -58,6 +58,45 @@ export const googleCalendarService = {
   },
 
   /**
+   * Helper to combine a YYYY-MM-DD date with the current local clock and format for Google Calendar ISO-8601
+   */
+  getDateTimeWithCurrentTime(dateString: string): { start: string; end: string } {
+    if (!dateString) {
+      dateString = new Date().toISOString().split('T')[0];
+    }
+    
+    // If it already has a full ISO datetime (containing 'T'), we can parse it
+    if (dateString.includes('T')) {
+      const parsedDate = new Date(dateString);
+      if (!isNaN(parsedDate.getTime())) {
+        const start = parsedDate.toISOString();
+        const end = new Date(parsedDate.getTime() + 60 * 60 * 1000).toISOString();
+        return { start, end };
+      }
+    }
+
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+
+    const tzOffsetMinutes = -now.getTimezoneOffset();
+    const diffSign = tzOffsetMinutes >= 0 ? '+' : '-';
+    const pad = (num: number) => String(Math.abs(num)).padStart(2, '0');
+    const tzOffsetString = diffSign + pad(Math.floor(tzOffsetMinutes / 60)) + ':' + pad(tzOffsetMinutes % 60);
+
+    const start = `${dateString}T${hours}:${minutes}:${seconds}${tzOffsetString}`;
+
+    const endNow = new Date(now.getTime() + 60 * 60 * 1000);
+    const endHours = String(endNow.getHours()).padStart(2, '0');
+    const endMinutes = String(endNow.getMinutes()).padStart(2, '0');
+    const endSeconds = String(endNow.getSeconds()).padStart(2, '0');
+    const end = `${dateString}T${endHours}:${endMinutes}:${endSeconds}${tzOffsetString}`;
+
+    return { start, end };
+  },
+
+  /**
    * Syncs custom details from the registration and demand model to a Google Calendar event.
    */
   async createEvent(
@@ -68,15 +107,17 @@ export const googleCalendarService = {
     try {
       const googleAccessToken = await this.getProviderToken();
 
+      const { start, end } = this.getDateTimeWithCurrentTime(demand.data_prevista_retorno || '');
+
       // Formulate detailed agenda metadata representing the active cabinet demand
       const event = {
         summary: `Retorno Demanda - ${registration.nome_completo}`,
         description: `✅ Cadastro de Eleitor e Demanda Realizado com Sucesso!\n\n🔹 Nome Completo: ${registration.nome_completo}\n🔹 Assunto/Demanda: ${demand.assunto}\n🔹 Observação: ${demand.observacoes || 'Nenhuma'}\n🔹 Responsável do Gabinete: ${creator?.full_name || 'Gabinete'}\n\n📢 Lembrete de retorno registrado de forma automática pelo sistema de Gabinete.`,
         start: {
-          date: demand.data_prevista_retorno || new Date().toISOString().split('T')[0],
+          dateTime: start,
         },
         end: {
-          date: demand.data_prevista_retorno || new Date().toISOString().split('T')[0],
+          dateTime: end,
         },
       };
 
@@ -100,7 +141,7 @@ export const googleCalendarService = {
         };
       }
 
-      const result = await response.ok ? await response.json() : {};
+      const result = await response.json().catch(() => ({}));
       return { 
         success: true, 
         data: { id: result.id || result.eventId || null },
@@ -129,14 +170,16 @@ export const googleCalendarService = {
 
       const googleAccessToken = await this.getProviderToken();
 
+      const { start, end } = this.getDateTimeWithCurrentTime(registration.data_proximo_contato);
+
       const event = {
         summary: `📞 Pós-Contato - ${registration.nome_completo}`,
         description: `✅ Cadastro de Eleitor Realizado com Sucesso!\n\n📢 Lembrete de Pós-Contato com o Eleitor:\n🔹 Nome Completo: ${registration.nome_completo}\n🔹 WhatsApp/Celular: ${registration.whatsapp || 'Não informado'}\n🔹 Responsável pelo Cadastro: ${creator?.full_name || 'Gabinete'}\n🔹 Cidade: ${registration.cidade || 'Não informada'}\n🔹 Bairro: ${registration.bairro || 'Não informado'}\n\nLembrete de retorno de contato sugerido em ${registration.intervalo_contato_dias} dias após o cadastro, registrado automaticamente pelo sistema de Gabinete.`,
         start: {
-          date: registration.data_proximo_contato,
+          dateTime: start,
         },
         end: {
-          date: registration.data_proximo_contato,
+          dateTime: end,
         },
       };
 
