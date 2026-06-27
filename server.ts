@@ -115,7 +115,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 // Dynamic Google credentials loader to ensure instant updates in long-running processes (e.g. Passenger)
 function getGoogleCredentials() {

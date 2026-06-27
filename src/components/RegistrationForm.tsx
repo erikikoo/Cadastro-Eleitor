@@ -31,14 +31,14 @@ const formSchema = z.object({
   cidade: z.string().min(1, 'A cidade é um campo muito importante'),
   estado: z.string().min(2, 'Informe a sigla do estado (ex: SP)'),
   dataNascimento: z.string().min(1, 'A data de nascimento nos ajuda a conhecer melhor o perfil do eleitor'),
-  sexo: z.enum(['M', 'F', 'Prefiro não dizer']),
+  sexo: z.string().min(1, 'Por favor, selecione o sexo do eleitor').refine(val => ['M', 'F', 'Prefiro não dizer'].includes(val), { message: 'Opção de sexo inválida' }),
   estado_civil: z.string().min(1, 'Por favor, selecione uma opção de estado civil'),
   nome_conjuge: z.string().optional(),
   quantidade_filhos: z.number().int().min(0),
   responsavel: z.string().min(1, 'O nome da pessoa que está cadastrando é essencial'),
   email: z.string().email('Este e-mail não parece estar em um formato válido').optional().or(z.literal('')),
   instagram: z.string().optional().or(z.literal('')),
-  whatsapp: z.string().optional().or(z.literal('')),
+  whatsapp: z.string().min(14, 'Por favor, informe o WhatsApp completo com DDD (ex: (11) 99999-9999)'),
   lembrete_contato_ativo: z.boolean(),
   intervalo_contato_dias: z.number().int().min(1),
   possuiFilhos: z.boolean(),
@@ -76,7 +76,7 @@ const sanitizeForForm = (data: Registration | undefined): Partial<FormValues> | 
     cidade: data.cidade || '',
     estado: data.estado || '',
     dataNascimento: data.dataNascimento || '',
-    sexo: (data.sexo === 'M' || data.sexo === 'F' || data.sexo === 'Prefiro não dizer') ? data.sexo : 'Prefiro não dizer',
+    sexo: (data.sexo === 'M' || data.sexo === 'F' || data.sexo === 'Prefiro não dizer') ? data.sexo : '',
     estado_civil: data.estado_civil || '',
     nome_conjuge: data.nome_conjuge || '',
     responsavel: data.responsavel || '',
@@ -124,7 +124,7 @@ export function RegistrationForm({ onSuccess, onCancel, initialData }: Registrat
     resolver: zodResolver(formSchema),
     defaultValues: sanitizeForForm(initialData) || {
       nome_completo: '',
-      sexo: 'Prefiro não dizer',
+      sexo: '',
       estado_civil: '',
       nome_conjuge: '',
       quantidade_filhos: 0,
@@ -246,6 +246,7 @@ export function RegistrationForm({ onSuccess, onCancel, initialData }: Registrat
 
     const newRegistration: Registration = {
       ...values,
+      sexo: values.sexo as any,
       id: initialData?.id || crypto.randomUUID(),
       created_at: initialData?.created_at || new Date().toISOString(),
       complemento: values.complemento || '',
@@ -402,7 +403,7 @@ export function RegistrationForm({ onSuccess, onCancel, initialData }: Registrat
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="nome_completo">Nome Completo do Eleitor</Label>
+          <Label htmlFor="nome_completo">Nome Completo do Eleitor <span className="text-red-500 font-bold">*</span></Label>
           <Input id="nome_completo" placeholder="Digite o nome completo" {...register('nome_completo')} />
           {errors.nome_completo && <p className="text-xs text-red-500">{errors.nome_completo.message}</p>}
         </div>
@@ -410,7 +411,7 @@ export function RegistrationForm({ onSuccess, onCancel, initialData }: Registrat
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="cep">CEP</Label>
+          <Label htmlFor="cep">CEP <span className="text-red-500 font-bold">*</span></Label>
           <div className="relative">
             <Input id="cep" placeholder="00000-000" {...register('cep')} />
             <div className="absolute right-3 top-2.5">
@@ -429,7 +430,7 @@ export function RegistrationForm({ onSuccess, onCancel, initialData }: Registrat
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="md:col-span-2 space-y-2">
-          <Label htmlFor="logradouro">Logradouro (Rua/Avenida)</Label>
+          <Label htmlFor="logradouro">Logradouro (Rua/Avenida) <span className="text-red-500 font-bold">*</span></Label>
           <Input id="logradouro" placeholder="Avenida Brasil" {...register('logradouro')} />
           {errors.logradouro && <p className="text-xs text-red-500">{errors.logradouro.message}</p>}
         </div>
@@ -446,14 +447,14 @@ export function RegistrationForm({ onSuccess, onCancel, initialData }: Registrat
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="bairro">Bairro</Label>
+          <Label htmlFor="bairro">Bairro <span className="text-red-500 font-bold">*</span></Label>
           <Input id="bairro" placeholder="Centro" {...register('bairro')} />
           {errors.bairro && <p className="text-xs text-red-500">{errors.bairro.message}</p>}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <div className="sm:col-span-2 space-y-2">
-            <Label htmlFor="cidade">Cidade</Label>
+            <Label htmlFor="cidade">Cidade <span className="text-red-500 font-bold">*</span></Label>
             <Input id="cidade" placeholder="São Paulo" {...register('cidade')} />
             {errors.cidade && <p className="text-xs text-red-500">{errors.cidade.message}</p>}
           </div>
@@ -467,13 +468,13 @@ export function RegistrationForm({ onSuccess, onCancel, initialData }: Registrat
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="dataNascimento">Data de Nascimento</Label>
+          <Label htmlFor="dataNascimento">Data de Nascimento <span className="text-red-500 font-bold">*</span></Label>
           <Input id="dataNascimento" type="date" {...register('dataNascimento')} />
           {errors.dataNascimento && <p className="text-xs text-red-500">{errors.dataNascimento.message}</p>}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="sexo">Sexo</Label>
+          <Label htmlFor="sexo">Sexo <span className="text-red-500 font-bold">*</span></Label>
           <Select 
             value={watch('sexo')} 
             onValueChange={(val) => setValue('sexo', val as any)}
@@ -503,7 +504,7 @@ export function RegistrationForm({ onSuccess, onCancel, initialData }: Registrat
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="estado_civil">Estado Civil</Label>
+          <Label htmlFor="estado_civil">Estado Civil <span className="text-red-500 font-bold">*</span></Label>
           <Select 
             value={watch('estado_civil')} 
             onValueChange={(val) => setValue('estado_civil', val as string)}
@@ -544,7 +545,7 @@ export function RegistrationForm({ onSuccess, onCancel, initialData }: Registrat
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="whatsapp">WhatsApp / Telefone</Label>
+          <Label htmlFor="whatsapp">WhatsApp / Telefone <span className="text-red-500 font-bold">*</span></Label>
           <Input 
             id="whatsapp" 
             placeholder="(00) 00000-0000" 

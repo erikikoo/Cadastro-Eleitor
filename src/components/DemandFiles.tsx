@@ -63,7 +63,7 @@ export const DemandFiles: React.FC<DemandFilesProps> = ({
 
   // Read file and convert to Base64
   const processFiles = (fileList: FileList) => {
-    const MAX_SIZE_MB = 4; // 4MB safe limit for DB sync + local storage
+    const MAX_SIZE_MB = 25; // 25MB safe limit for DB sync + local storage
     const acceptedFiles: File[] = [];
 
     for (let i = 0; i < fileList.length; i++) {
@@ -233,7 +233,7 @@ export const DemandFiles: React.FC<DemandFilesProps> = ({
             <span className="text-xs font-bold">Anexar Documentos</span>
           </div>
           <p className="text-[10px] text-slate-400">
-            PDF, Word, Excel ou imagens de até 4MB (Arraste ou clique)
+            PDF, Word, Excel ou imagens de até 25MB (Arraste ou clique)
           </p>
         </div>
       )}

@@ -56,10 +56,21 @@ const MOCK_DATA: Registration[] = [
   }
 ];
 
+const safeLocalStorageSetItem = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (error: any) {
+    if (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+      throw new Error('Limite de armazenamento local do navegador excedido. Como você está anexando arquivos maiores, é altamente recomendado configurar a sincronização do Supabase ou remover anexos antigos para liberar espaço.');
+    }
+    throw error;
+  }
+};
+
 export const getLocalRegistrations = (): Registration[] => {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (!stored) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(MOCK_DATA));
+    safeLocalStorageSetItem(STORAGE_KEY, JSON.stringify(MOCK_DATA));
     return MOCK_DATA;
   }
   return JSON.parse(stored);
@@ -113,7 +124,7 @@ export const saveRegistration = async (registration: Registration) => {
         registrations.unshift(registration);
       }
       
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
+      safeLocalStorageSetItem(STORAGE_KEY, JSON.stringify(registrations));
       
       // Rethrow to notify the UI of the sync failure
       throw error;
@@ -129,7 +140,7 @@ export const saveRegistration = async (registration: Registration) => {
     registrations.unshift(registration);
   }
   
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
+  safeLocalStorageSetItem(STORAGE_KEY, JSON.stringify(registrations));
 };
 
 export const deleteRegistration = async (id: string) => {
@@ -153,7 +164,7 @@ export const deleteRegistration = async (id: string) => {
 
   const registrations = getLocalRegistrations();
   const filtered = registrations.filter(r => r.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+  safeLocalStorageSetItem(STORAGE_KEY, JSON.stringify(filtered));
 };
 
 export const calculateAge = (birthDate: string): number => {
