@@ -775,6 +775,17 @@ function AppContent() {
           </div>
           
           <div className="flex items-center gap-4">
+            {profile?.role !== 'lider' && (
+              <Button 
+                size="sm" 
+                variant="outline"
+                className="hidden sm:flex border-blue-200 text-blue-600 hover:bg-blue-50 rounded-lg gap-2"
+                onClick={() => setActiveTab('quick')}
+              >
+                <Zap className="h-4 w-4" />
+                Cadastro Rápido
+              </Button>
+            )}
             <Button 
               size="sm" 
               className="hidden sm:flex bg-blue-600 hover:bg-blue-700 text-white rounded-lg gap-2"
@@ -902,6 +913,7 @@ function AppContent() {
                 {activeTab === 'dashboard' && 'Visão Estratégica'}
                 {activeTab === 'analysis' && 'Indicadores de Família'}
                 {activeTab === 'list' && 'Base de Dados'}
+                {activeTab === 'quick' && 'Cadastro Express'}
                 {activeTab === 'new' && 'Cadastro Completo'}
                 {activeTab === 'demands' && 'Demandas do Eleitorado'}
                 {activeTab === 'team' && 'Gestão de Equipe'}
@@ -910,6 +922,7 @@ function AppContent() {
                 {activeTab === 'dashboard' && 'Acompanhe os indicadores e tendências em tempo real.'}
                 {activeTab === 'analysis' && 'Métricas detalhadas sobre mães, pais e crianças por bairro.'}
                 {activeTab === 'list' && 'Gerencie e filtre todos os registros da plataforma.'}
+                {activeTab === 'quick' && 'Capture apenas os dados essenciais para agilizar o atendimento.'}
                 {activeTab === 'new' && 'Preencha o perfil detalhado do eleitor com todas as informações.'}
                 {activeTab === 'demands' && 'Controle global de pedidos, prazos e pós-contatos.'}
                 {activeTab === 'team' && 'Administre os acessos e permissões dos operadores.'}
@@ -949,6 +962,12 @@ function AppContent() {
                     return null;
                   })()}
                 </TabsTrigger>
+                {profile?.role !== 'lider' && (
+                  <TabsTrigger value="quick" className="rounded-lg py-2 px-3 md:px-4 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md">
+                    <Zap className="h-4 w-4 md:mr-2" />
+                    <span className="hidden md:inline">Express</span>
+                  </TabsTrigger>
+                )}
                 <TabsTrigger value="new" className="rounded-lg py-2 px-3 md:px-4 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md">
                   <PlusCircle className="h-4 w-4 md:mr-2" />
                   <span className="hidden md:inline">{editingRegistration ? 'Editar' : 'Completo'}</span>
@@ -992,6 +1011,22 @@ function AppContent() {
           <TabsContent value="list" className="outline-none">
             <RegistrationList data={displayedRegistrations} onRefresh={refreshData} onEdit={handleEdit} />
           </TabsContent>
+
+          {profile?.role !== 'lider' && (
+            <TabsContent value="quick" className="outline-none">
+              <div className="max-w-4xl mx-auto">
+                <QuickRegistrationForm 
+                  onSuccess={() => {
+                    refreshData();
+                    setActiveTab('list');
+                  }}
+                  onCancel={() => {
+                    setActiveTab('list');
+                  }}
+                />
+              </div>
+            </TabsContent>
+          )}
 
           <TabsContent value="new" className="outline-none">
             <div className="max-w-4xl mx-auto">
